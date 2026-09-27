@@ -2,18 +2,17 @@
 const STORAGE_KEY_QUESTIONS = 'daily_tracker_questions';
 const STORAGE_KEY_ENTRIES = 'daily_tracker_entries';
 
-// Default initial setup if empty
 const defaultQuestions = [
-  { id: 'q1', text: 'Horniness' },
-  { id: 'q2', text: 'Desire for porn' },
-  { id: 'q3', text: 'Desire for sex' },
-  { id: 'q4', text: 'Mood (1-10)' }
+  { id: 'q1', text: 'Desire for porn (1-10)' },
+  { id: 'q2', text: 'Horniness (1-10)' },
+  { id: 'q3', text: 'Desire for sex (1-10)' },
+{id: 'q4', text: 'Mood (1-10)'}
 ];
 
 let questions = JSON.parse(localStorage.getItem(STORAGE_KEY_QUESTIONS)) || defaultQuestions;
 let entries = JSON.parse(localStorage.getItem(STORAGE_KEY_ENTRIES)) || {};
+let currentSession = 'AM'; // Default session
 
-// Color palette for chart lines
 const chartColors = [
   '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', 
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
@@ -23,6 +22,8 @@ let chartInstance = null;
 
 // DOM Elements
 const entryDateInput = document.getElementById('entry-date');
+const sessionAmBtn = document.getElementById('session-am');
+const sessionPmBtn = document.getElementById('session-pm');
 const questionsContainer = document.getElementById('questions-inputs-container');
 const noQuestionsNotice = document.getElementById('no-questions-notice');
 const trackerForm = document.getElementById('tracker-form');
@@ -31,32 +32,31 @@ const noticeSetupBtn = document.getElementById('notice-setup-btn');
 const questionsModal = document.getElementById('questions-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const doneModalBtn = document.getElementById('done-modal-btn');
-const addQuestionForm = document.getElementById('add-question-form');
+const addQuestionForm = document.addQuestionForm || document.getElementById('add-question-form');
 const newQuestionInput = document.getElementById('new-question-text');
 const modalQuestionsList = document.getElementById('modal-questions-list');
 const historyTableHead = document.getElementById('history-table-head');
 const historyTableBody = document.getElementById('history-table-body');
 const exportCsvBtn = document.getElementById('export-csv-btn');
 
-// Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
-  // Set default date input to today (YYYY-MM-DD local)
   const today = new Date().toLocaleDateString('en-CA');
   entryDateInput.value = today;
 
-  // Initialize Lucide icons
   lucide.createIcons();
 
-  // Render UI Components
   renderFormQuestions();
-  loadDateEntry(today);
+  loadDateEntry(today, currentSession);
   renderHistoryTable();
   initChart();
 
   // Event Listeners
-  entryDateInput.addEventListener('change', (e) => loadDateEntry(e.target.value));
-  trackerForm.addEventListener('submit', handleFormSubmit);
+  entryDateInput.addEventListener('change', () => loadDateEntry(entryDateInput.value, currentSession));
   
+  sessionAmBtn.addEventListener('click', () => setSession('AM'));
+  sessionPmBtn.addEventListener('click', () => setSession('PM'));
+
+  trackerForm.addEventListener('submit', handleFormSubmit);
   manageQuestionsBtn.addEventListener('click', openModal);
   noticeSetupBtn.addEventListener('click', openModal);
   closeModalBtn.addEventListener('click', closeModal);
@@ -65,7 +65,22 @@ document.addEventListener('DOMContentLoaded', () => {
   exportCsvBtn.addEventListener('click', exportToCSV);
 });
 
-// Save State Helpers
+function setSession(session) {
+  currentSession = session;
+  if (session === 'AM') {
+    sessionAmBtn.className = "px-3 py-1 rounded-md transition-all duration-150 bg-white text-indigo-600 shadow-sm font-semibold";
+    sessionPmBtn.className = "px-3 py-1 rounded-md transition-all duration-150 text-slate-600 hover:text-slate-900";
+  } else {
+    sessionPmBtn.className = "px-3 py-1 rounded-md transition-all duration-150 bg-white text-indigo-600 shadow-sm font-semibold";
+    sessionAmBtn.className = "px-3 py-1 rounded-md transition-all duration-150 text-slate-600 hover:text-slate-900";
+  }
+  loadDateEntry(entryDateInput.value, currentSession);
+}
+
+function getEntryKey(dateStr, sessionStr) {
+  return `${dateStr}-${sessionStr}`;
+}
+
 function saveQuestionsState() {
   localStorage.setItem(STORAGE_KEY_QUESTIONS, JSON.stringify(questions));
 }
@@ -74,7 +89,6 @@ function saveEntriesState() {
   localStorage.setItem(STORAGE_KEY_ENTRIES, JSON.stringify(entries));
 }
 
-// Render Input Form Fields
 function renderFormQuestions() {
   questionsContainer.innerHTML = '';
 
@@ -97,9 +111,9 @@ function renderFormQuestions() {
   });
 }
 
-// Load existing values into form for selected date
-function loadDateEntry(dateStr) {
-  const entryData = entries[dateStr] || {};
+function loadDateEntry(dateStr, sessionStr) {
+  const entryKey = getEntryKey(dateStr, sessionStr);
+  const entryData = entries[entryKey] || {};
   
   questions.forEach(q => {
     const input = document.getElementById(`q_${q.id}`);
@@ -109,12 +123,12 @@ function loadDateEntry(dateStr) {
   });
 }
 
-// Handle Form Submission (Saving Data)
 function handleFormSubmit(e) {
   e.preventDefault();
   const dateVal = entryDateInput.value;
   if (!dateVal) return;
 
+  const entryKey = getEntryKey(dateVal, currentSession);
   const entryData = {};
   let hasValue = false;
 
@@ -127,19 +141,18 @@ function handleFormSubmit(e) {
   });
 
   if (hasValue) {
-    entries[dateVal] = entryData;
+    entries[entryKey] = entryData;
   } else {
-    delete entries[dateVal];
+    delete entries[entryKey];
   }
 
   saveEntriesState();
   renderHistoryTable();
   updateChart();
 
-  // Visual feedback
   const btn = document.getElementById('save-entry-btn');
   const originalHTML = btn.innerHTML;
-  btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Saved!`;
+  btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Saved (${currentSession})!`;
   btn.classList.replace('bg-indigo-600', 'bg-emerald-600');
   lucide.createIcons();
 
@@ -150,7 +163,6 @@ function handleFormSubmit(e) {
   }, 1500);
 }
 
-// Modal Handlers
 function openModal() {
   renderModalQuestionsList();
   questionsModal.classList.remove('hidden');
@@ -159,7 +171,7 @@ function openModal() {
 function closeModal() {
   questionsModal.classList.add('hidden');
   renderFormQuestions();
-  loadDateEntry(entryDateInput.value);
+  loadDateEntry(entryDateInput.value, currentSession);
   renderHistoryTable();
   updateChart();
 }
@@ -177,7 +189,7 @@ function renderModalQuestionsList() {
     li.className = "flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-100 text-sm";
     li.innerHTML = `
       <span class="text-slate-700 font-medium">${q.text}</span>
-      <button text-red-500 hover:text-red-700 data-action="delete" data-id="${q.id}" class="text-slate-400 hover:text-red-500 p-1 rounded transition-colors">
+      <button data-action="delete" data-id="${q.id}" class="text-slate-400 hover:text-red-500 p-1 rounded transition-colors">
         <i data-lucide="trash-2" class="w-4 h-4"></i>
       </button>
     `;
@@ -203,23 +215,21 @@ function handleAddQuestion(e) {
 }
 
 function handleDeleteQuestion(id) {
-  if (confirm('Delete this question? Existing historical numbers for this question will remain in records.')) {
+  if (confirm('Delete this question? Existing historical numbers will remain.')) {
     questions = questions.filter(q => q.id !== id);
     saveQuestionsState();
     renderModalQuestionsList();
   }
 }
 
-// Render Table History
 function renderHistoryTable() {
   historyTableHead.innerHTML = '';
   historyTableBody.innerHTML = '';
 
-  const dates = Object.keys(entries).sort().reverse();
+  const entryKeys = Object.keys(entries).sort().reverse();
 
-  // Create Headers
   const trHead = document.createElement('tr');
-  let headHTML = `<th class="px-4 py-3">Date</th>`;
+  let headHTML = `<th class="px-4 py-3">Date</th><th class="px-4 py-3">Session</th>`;
   questions.forEach(q => {
     headHTML += `<th class="px-4 py-3">${q.text}</th>`;
   });
@@ -227,27 +237,31 @@ function renderHistoryTable() {
   trHead.innerHTML = headHTML;
   historyTableHead.appendChild(trHead);
 
-  if (dates.length === 0) {
+  if (entryKeys.length === 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="${questions.length + 2}" class="px-4 py-6 text-center text-slate-400">No logs stored yet. Add an entry above!</td>`;
+    tr.innerHTML = `<td colspan="${questions.length + 3}" class="px-4 py-6 text-center text-slate-400">No logs stored yet. Add an entry above!</td>`;
     historyTableBody.appendChild(tr);
     return;
   }
 
-  // Create Rows
-  dates.forEach(date => {
+  entryKeys.forEach(key => {
+    const [date, session] = [key.slice(0, 10), key.slice(11)];
     const tr = document.createElement('tr');
     tr.className = "hover:bg-slate-50/80 transition-colors";
 
-    let rowHTML = `<td class="px-4 py-3 font-medium text-slate-900">${date}</td>`;
+    const sessionBadge = session === 'AM' 
+      ? `<span class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-semibold">Morning</span>`
+      : `<span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded font-semibold">Evening</span>`;
+
+    let rowHTML = `<td class="px-4 py-3 font-medium text-slate-900">${date}</td><td class="px-4 py-3">${sessionBadge}</td>`;
     questions.forEach(q => {
-      const val = entries[date][q.id];
+      const val = entries[key][q.id];
       rowHTML += `<td class="px-4 py-3">${val !== undefined ? val : '-'}</td>`;
     });
 
     rowHTML += `
       <td class="px-4 py-3 text-right">
-        <button data-date="${date}" class="delete-entry-btn text-slate-400 hover:text-red-500 p-1 transition-colors" title="Delete day entry">
+        <button data-key="${key}" class="delete-entry-btn text-slate-400 hover:text-red-500 p-1 transition-colors" title="Delete session entry">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
         </button>
       </td>
@@ -257,18 +271,15 @@ function renderHistoryTable() {
     historyTableBody.appendChild(tr);
   });
 
-  // Attach delete handlers
   document.querySelectorAll('.delete-entry-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const d = e.currentTarget.getAttribute('data-date');
-      if (confirm(`Delete entries for ${d}?`)) {
-        delete entries[d];
+      const k = e.currentTarget.getAttribute('data-key');
+      if (confirm(`Delete entry for ${k}?`)) {
+        delete entries[k];
         saveEntriesState();
         renderHistoryTable();
         updateChart();
-        if (entryDateInput.value === d) {
-          loadDateEntry(d);
-        }
+        loadDateEntry(entryDateInput.value, currentSession);
       }
     });
   });
@@ -276,7 +287,6 @@ function renderHistoryTable() {
   lucide.createIcons();
 }
 
-// Chart Visualization
 function initChart() {
   const ctx = document.getElementById('trendsChart').getContext('2d');
   
@@ -297,26 +307,20 @@ function initChart() {
         }
       },
       scales: {
-        x: {
-          grid: { display: false }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: '#f1f5f9' }
-        }
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: '#f1f5f9' } }
       }
     }
   });
 }
 
 function getChartData() {
-  // Sort dates ascending for chart
-  const dates = Object.keys(entries).sort().slice(-14);
+  const keys = Object.keys(entries).sort().slice(-20); // Last 20 logs (AM & PM)
 
   const datasets = questions.map((q, idx) => {
     return {
       label: q.text,
-      data: dates.map(d => entries[d][q.id] !== undefined ? entries[d][q.id] : null),
+      data: keys.map(k => entries[k][q.id] !== undefined ? entries[k][q.id] : null),
       borderColor: chartColors[idx % chartColors.length],
       backgroundColor: chartColors[idx % chartColors.length] + '20',
       spanGaps: true,
@@ -326,7 +330,10 @@ function getChartData() {
     };
   });
 
-  return { labels: dates, datasets };
+  return { 
+    labels: keys.map(k => `${k.slice(5, 10)} (${k.slice(11)})`), 
+    datasets 
+  };
 }
 
 function updateChart() {
@@ -336,31 +343,28 @@ function updateChart() {
   }
 }
 
-// Export Data to CSV
 function exportToCSV() {
-  const dates = Object.keys(entries).sort();
-  if (dates.length === 0) {
+  const keys = Object.keys(entries).sort();
+  if (keys.length === 0) {
     alert('No data to export.');
     return;
   }
 
   let csvContent = 'data:text/csv;charset=utf-8,';
   
-  // Header row
-  const headers = ['Date', ...questions.map(q => `"${q.text.replace(/"/g, '""')}"`)];
+  const headers = ['Date', 'Session', ...questions.map(q => `"${q.text.replace(/"/g, '""')}"`)];
   csvContent += headers.join(',') + '\r\n';
 
-  // Rows
-  dates.forEach(date => {
-    const row = [date];
+  keys.forEach(key => {
+    const [date, session] = [key.slice(0, 10), key.slice(11)];
+    const row = [date, session];
     questions.forEach(q => {
-      const val = entries[date][q.id];
+      const val = entries[key][q.id];
       row.push(val !== undefined ? val : '');
     });
     csvContent += row.join(',') + '\r\n';
   });
 
-  // Download Trigger
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
@@ -368,4 +372,4 @@ function exportToCSV() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-    }
+}
