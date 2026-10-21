@@ -315,7 +315,7 @@ function initChart() {
 }
 
 function getChartData() {
-  const keys = Object.keys(entries).sort().slice(-40); // Last 20 logs (AM & PM)
+  const keys = Object.keys(entries).sort().slice(-60); // Last 20 logs (AM & PM)
 
   const datasets = questions.map((q, idx) => {
     return {
